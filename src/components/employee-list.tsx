@@ -1,19 +1,32 @@
+
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react'; // Import useState
 import { useEmployees } from '@/hooks/useEmployees';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { LogIn, LogOut, User, Clock, Users } from 'lucide-react'; // Import Users icon
+import { LogIn, LogOut, User, Clock, Users, Trash2 } from 'lucide-react'; // Import Trash2 icon
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Timestamp } from 'firebase/firestore'; // Import Timestamp directly
+import type { Timestamp } from 'firebase/firestore';
+import type { Employee } from '@/types/employee'; // Import Employee type
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 interface EmployeeListProps {
   filter: 'all' | 'present';
   title: string;
-  searchQuery?: string; // Optional search query prop
+  searchQuery?: string;
 }
 
 export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListProps) {
@@ -24,30 +37,32 @@ export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListPr
     isLoadingPresent,
     checkIn,
     checkOut,
+    deleteEmployee, // Get delete function
     isUpdating,
+    isDeleting, // Get deleting state
   } = useEmployees();
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
 
   const isLoading = filter === 'all' ? isLoadingAll : isLoadingPresent;
   const baseEmployees = filter === 'all' ? allEmployees : presentEmployees;
 
-  // Filter employees based on search query if applicable
   const filteredEmployees = filter === 'all' && searchQuery
     ? baseEmployees.filter(employee =>
         employee.name.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : baseEmployees;
 
-  // Sort employees alphabetically by name
   const sortedEmployees = [...filteredEmployees].sort((a, b) => a.name.localeCompare(b.name));
 
-  const renderTimestamp = (timestamp: Timestamp | null) => { // Use Timestamp type directly
+  const renderTimestamp = (timestamp: Timestamp | null) => {
     if (!timestamp) return '-';
     try {
       const date = timestamp.toDate();
       return formatDistanceToNow(date, { addSuffix: true });
     } catch (error) {
       console.error("Error formatting timestamp:", timestamp, error);
-      // Check if timestamp is a Firestore Timestamp object before calling toDate()
       if (timestamp && typeof timestamp.toDate === 'function') {
          try {
             const date = timestamp.toDate();
@@ -57,14 +72,27 @@ export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListPr
              return 'Invalid Date';
          }
       }
-      return 'Invalid Date Input'; // Handle cases where input is not a valid Timestamp
+      return 'Invalid Date Input';
     }
+  };
+
+  const handleDeleteClick = (employee: Employee) => {
+    setEmployeeToDelete(employee);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (employeeToDelete) {
+      deleteEmployee(employeeToDelete.id);
+    }
+    setIsDeleteDialogOpen(false);
+    setEmployeeToDelete(null);
   };
 
   const renderTableContent = () => {
      if (isLoading) {
         return (
-          <div className="space-y-2 p-4"> {/* Added padding for loading state */}
+          <div className="space-y-2 p-4">
             {[...Array(5)].map((_, i) => (
                <div key={i} className="flex items-center justify-between p-2">
                  <div className="flex items-center gap-2">
@@ -101,7 +129,21 @@ export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListPr
             <TableBody>
               {sortedEmployees.map((employee) => (
                 <TableRow key={employee.id}>
-                  <TableCell className="font-medium">{employee.name}</TableCell>
+                  <TableCell className="font-medium flex items-center gap-2">
+                     {filter === 'all' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteClick(employee)}
+                        disabled={isDeleting && employeeToDelete?.id === employee.id} // Disable if this is being deleted
+                        aria-label={`Delete ${employee.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                     )}
+                     {employee.name}
+                  </TableCell>
                   {filter === 'all' && (
                      <TableCell>
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${employee.status === 'in' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
@@ -117,7 +159,7 @@ export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListPr
                         variant="outline"
                         size="sm"
                         onClick={() => checkIn(employee.id)}
-                        disabled={isUpdating}
+                        disabled={isUpdating || (isDeleting && employeeToDelete?.id === employee.id)}
                         aria-label={`Check in ${employee.name}`}
                         className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
                       >
@@ -128,7 +170,7 @@ export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListPr
                         variant="outline"
                         size="sm"
                         onClick={() => checkOut(employee.id)}
-                        disabled={isUpdating}
+                        disabled={isUpdating || (isDeleting && employeeToDelete?.id === employee.id)}
                         aria-label={`Check out ${employee.name}`}
                         className="border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
                       >
@@ -145,38 +187,37 @@ export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListPr
 
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {filter === 'present' ? <User className="h-5 w-5 text-primary" /> : <Users className="h-5 w-5 text-secondary" />}
-          {title} ({isLoading ? '...' : sortedEmployees.length})
-        </CardTitle>
-      </CardHeader>
-      {/* Removed default padding from CardContent to allow Table/Skeleton to control spacing */}
-      <CardContent className="p-0">
-         {renderTableContent()}
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {filter === 'present' ? <User className="h-5 w-5 text-primary" /> : <Users className="h-5 w-5 text-secondary" />}
+            {title} ({isLoading ? '...' : sortedEmployees.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+           {renderTableContent()}
+        </CardContent>
+      </Card>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete{' '}
+              <strong>{employeeToDelete?.name}</strong> from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setEmployeeToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className={buttonVariants({ variant: "destructive" })}>
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
-
-// Keep the Users icon component as it is
-// const Users = (props: React.SVGProps<SVGSVGElement>) => (
-//   <svg
-//     xmlns="http://www.w3.org/2000/svg"
-//     width="24"
-//     height="24"
-//     viewBox="0 0 24 24"
-//     fill="none"
-//     stroke="currentColor"
-//     strokeWidth="2"
-//     strokeLinecap="round"
-//     strokeLinejoin="round"
-//     {...props}
-//   >
-//     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-//     <circle cx="9" cy="7" r="4" />
-//     <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-//     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-//   </svg>
-// );
