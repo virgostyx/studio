@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "id": "74366d7f-4b8b-4060-abcd-575af66bb0bb",
+    "name": "Bruno FIEVET",
+    "department": "Administration",
+    "status": "in",
+    "lastCheckIn": "2025-04-30T20:40:32.223Z",
+    "lastCheckOut": null
+  },
+  {
+    "id": "67e20f16-d4c1-47ac-8e6b-37223564f8c5",
+    "name": "Julien DUVAL",
+    "department": "Head of Delegation",
+    "status": "out",
+    "lastCheckIn": null,
+    "lastCheckOut": null
+  },
+  {
+    "id": "a80a2775-8e43-4f51-aebe-6d3df6059a36",
+    "name": "Henriette GEIGER",
+    "department": "Head of Delegation",
+    "status": "in",
+    "lastCheckIn": "2025-04-30T20:40:56.910Z",
+    "lastCheckOut": null
+  }
+]

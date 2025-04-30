@@ -1,4 +1,5 @@
 
+
 "use client"; // Add 'use client' directive
 
 import { EmployeeList } from '@/components/employee-list';
@@ -84,25 +85,26 @@ export default function Home() {
             </div>
           </div>
 
-
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-               <Button variant="default" className="w-full md:w-auto mt-2 md:mt-0">
-                 <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
-               </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Add New Employee</DialogTitle>
-                <DialogDescription>
-                  Enter the name and department of the new employee.
-                </DialogDescription>
-              </DialogHeader>
-              {/* Pass department prop to AddEmployeeForm */}
-              <AddEmployeeForm onFormSubmit={() => setIsAddDialogOpen(false)} /> {/* Close dialog on submit */}
-            </DialogContent>
-          </Dialog>
-
+          {/* Conditionally render Add Employee button only for 'all' tab */}
+          {activeTab === 'all' && (
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                 <Button variant="default" className="w-full md:w-auto mt-2 md:mt-0">
+                   <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
+                 </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Add New Employee</DialogTitle>
+                  <DialogDescription>
+                    Enter the name and department of the new employee.
+                  </DialogDescription>
+                </DialogHeader>
+                {/* Pass department prop to AddEmployeeForm */}
+                <AddEmployeeForm onFormSubmit={() => setIsAddDialogOpen(false)} /> {/* Close dialog on submit */}
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
         <TabsContent value="present">
           {/* Pass the searchQuery and selectedDepartment state to the 'present' list */}
@@ -127,3 +129,4 @@ export default function Home() {
     </main>
   );
 }
+
