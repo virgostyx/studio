@@ -1,3 +1,5 @@
+"use client"; // Add 'use client' directive
+
 import { EmployeeList } from '@/components/employee-list';
 import { AddEmployeeForm } from '@/components/add-employee-form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';

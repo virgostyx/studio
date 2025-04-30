@@ -1,165 +1,171 @@
-import { useFirestoreQueryData } from '@tanstack-query-firebase/react'; // Corrected import based on likely v1 structure
-// Removed: import { useFirestoreMutation } from '@tanstack-query-firebase/react';
-import { collection, query, where, doc, updateDoc, serverTimestamp, getDocs, writeBatch, addDoc, Timestamp } from 'firebase/firestore';
-import { useQueryClient, useMutation } from '@tanstack/react-query'; // Import useMutation
+import { collection, query, where, doc, updateDoc, serverTimestamp, getDocs, addDoc, Timestamp, onSnapshot, QuerySnapshot, DocumentData, Query } from 'firebase/firestore'; // Added Query, QuerySnapshot, DocumentData
+import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query'; // Import useQuery
 import { db } from '@/lib/firebase';
 import type { Employee } from '@/types/employee';
 import { useToast } from '@/hooks/use-toast';
-// Removed: import type firebase from 'firebase/compat/app'; // Import firebase namespace for Timestamp type hint if needed, otherwise remove if Timestamp comes directly from 'firebase/firestore'
+import React from 'react'; // Import React for useEffect
 
 const EMPLOYEES_COLLECTION = 'employees';
-
-// Key for TanStack Query caching
 const queryKeyAll = ['employees'];
 const queryKeyPresent = ['employees', 'present'];
 
-// Helper to seed initial data if collection is empty - commented out as seeding might not be desired on every hook usage
-// const seedInitialEmployees = async () => {
-//   const employeesCollectionRef = collection(db, EMPLOYEES_COLLECTION);
-//   const snapshot = await getDocs(query(employeesCollectionRef));
-
-//   if (snapshot.empty) {
-//     console.log('No employees found, seeding initial data...');
-//     const batch = writeBatch(db);
-//     const initialEmployees = [
-//       { name: 'Alice Smith', status: 'out', lastCheckIn: null, lastCheckOut: null },
-//       { name: 'Bob Johnson', status: 'out', lastCheckIn: null, lastCheckOut: null },
-//       { name: 'Charlie Brown', status: 'out', lastCheckIn: null, lastCheckOut: null },
-//       { name: 'Diana Prince', status: 'out', lastCheckIn: null, lastCheckOut: null },
-//     ];
-
-//     initialEmployees.forEach(emp => {
-//       const docRef = doc(employeesCollectionRef); // Auto-generate ID
-//       batch.set(docRef, emp);
-//     });
-
-//     await batch.commit();
-//     console.log('Initial employee data seeded.');
-//   }
+// Helper function to fetch employees initially (optional, as onSnapshot provides initial data)
+// const fetchEmployees = async (q: Query<DocumentData>): Promise<Employee[]> => {
+//     const snapshot = await getDocs(q);
+//     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
 // };
 
-
 export function useEmployees() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
 
-  // Seed data on initial load (consider doing this server-side or in a setup script for production)
-  // React.useEffect(() => {
-  //   seedInitialEmployees();
-  // }, []);
+    // --- Real-time Query for All Employees (using useQuery + useEffect/onSnapshot) ---
+    const allEmployeesQuery = useQuery<Employee[]>({
+        queryKey: queryKeyAll,
+        // queryFn is not strictly needed here if useEffect handles the initial load and updates
+        // If needed for SSR or initial fetch before listener attaches, use fetchEmployees
+        queryFn: async () => {
+             console.log("QueryFn executing for all employees..."); // Debug log
+             const q = query(collection(db, EMPLOYEES_COLLECTION));
+             const snapshot = await getDocs(q); // Use getDocs for initial fetch via queryFn
+             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+        },
+        staleTime: Infinity, // Data is managed by the real-time listener
+        refetchOnWindowFocus: false, // Avoid refetching when listener is active
+    });
 
-  // Query for all employees using useFirestoreQueryData
-  // Note: The types might need adjustment based on the actual v1 implementation if `useFirestoreQueryData` expects different generics.
-  const allEmployeesQuery = useFirestoreQueryData<Employee>(
-    queryKeyAll,
-    query(collection(db, EMPLOYEES_COLLECTION)),
-    {
-      subscribe: true, // Keep listening for real-time updates
-      idField: 'id', // Automatically map document ID to 'id' field
-    }
-  );
+    // --- Real-time Query for Present Employees (using useQuery + useEffect/onSnapshot) ---
+    const presentEmployeesQuery = useQuery<Employee[]>({
+        queryKey: queryKeyPresent,
+        // queryFn for initial fetch
+        queryFn: async () => {
+            console.log("QueryFn executing for present employees..."); // Debug log
+            const q = query(collection(db, EMPLOYEES_COLLECTION), where('status', '==', 'in'));
+            const snapshot = await getDocs(q); // Use getDocs for initial fetch via queryFn
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+        },
+        staleTime: Infinity,
+        refetchOnWindowFocus: false,
+    });
 
-  // Query for employees currently 'in' the office using useFirestoreQueryData
-  const presentEmployeesQuery = useFirestoreQueryData<Employee>(
-    queryKeyPresent,
-    query(collection(db, EMPLOYEES_COLLECTION), where('status', '==', 'in')),
-    {
-      subscribe: true, // Keep listening for real-time updates
-      idField: 'id', // Automatically map document ID to 'id' field
-    }
-  );
-
- // Mutation hook for updating employee status using useMutation
-  const updateEmployeeMutation = useMutation({
-    mutationFn: async (variables: { employeeId: string; status: 'in' | 'out' }) => {
-      const docRef = doc(db, EMPLOYEES_COLLECTION, variables.employeeId);
-      // Type assertion for updateData to satisfy Firestore's update requirements
-      const updateData: { [key: string]: any } = { status: variables.status };
-      if (variables.status === 'in') {
-        updateData.lastCheckIn = serverTimestamp();
-      } else {
-        updateData.lastCheckOut = serverTimestamp();
-      }
-      await updateDoc(docRef, updateData);
-    },
-     onSuccess: (_, variables) => {
-       // Invalidate both queries to refetch/update the cache
-       queryClient.invalidateQueries({ queryKey: queryKeyAll });
-       queryClient.invalidateQueries({ queryKey: queryKeyPresent });
-       toast({
-         title: "Status Updated",
-         description: `Employee marked as ${variables.status}.`,
-       });
-     },
-     onError: (error: Error, variables) => { // Add type for error
-       console.error("Error updating employee status:", error);
-       toast({
-         variant: "destructive",
-         title: "Update Failed",
-         description: `Could not mark employee as ${variables.status}. Please try again.`,
-       });
-     },
-  });
-
-
-  // Mutation hook for adding a new employee using useMutation
-  const addEmployeeMutation = useMutation({
-     mutationFn: async (variables: { name: string }) => {
-      const newEmployeeData: Omit<Employee, 'id'> = { // Define type for new employee data
-        name: variables.name,
-        status: 'out', // Default status
-        lastCheckIn: null, // Initialize timestamps
-        lastCheckOut: null,
-      };
-      // Use addDoc from 'firebase/firestore'
-      await addDoc(collection(db, EMPLOYEES_COLLECTION), newEmployeeData);
-    },
-    onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: queryKeyAll });
-        toast({
-          title: "Employee Added",
-          description: "New employee successfully added.",
+    // --- Effect for Real-time Updates (using onSnapshot) ---
+    React.useEffect(() => {
+        console.log("Setting up Firestore listeners..."); // Debug log
+        const qAll = query(collection(db, EMPLOYEES_COLLECTION));
+        const unsubscribeAll = onSnapshot(qAll, (snapshot: QuerySnapshot<DocumentData>) => {
+            console.log("Received update for all employees:", snapshot.docs.length); // Debug log
+            const updatedData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+            queryClient.setQueryData(queryKeyAll, updatedData); // Update cache directly
+        }, (error) => {
+            console.error("Error listening to all employees:", error);
+            toast({ variant: "destructive", title: "Listener Error", description: "Could not listen for all employee updates." });
         });
-      },
-      onError: (error: Error) => { // Add type for error
-        console.error("Error adding employee:", error);
-        toast({
-          variant: "destructive",
-          title: "Add Failed",
-          description: "Could not add the new employee. Please try again.",
+
+        const qPresent = query(collection(db, EMPLOYEES_COLLECTION), where('status', '==', 'in'));
+        const unsubscribePresent = onSnapshot(qPresent, (snapshot: QuerySnapshot<DocumentData>) => {
+             console.log("Received update for present employees:", snapshot.docs.length); // Debug log
+            const updatedData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+            queryClient.setQueryData(queryKeyPresent, updatedData); // Update cache directly
+        }, (error) => {
+            console.error("Error listening to present employees:", error);
+            toast({ variant: "destructive", title: "Listener Error", description: "Could not listen for present employee updates." });
         });
-      },
-  });
 
+        // Cleanup listeners on unmount
+        return () => {
+            console.log("Cleaning up Firestore listeners..."); // Debug log
+            unsubscribeAll();
+            unsubscribePresent();
+        };
+    }, [queryClient, toast]); // Include toast in dependency array
 
-  const checkIn = (employeeId: string) => {
-    updateEmployeeMutation.mutate({ employeeId, status: 'in' });
-  };
+    // --- Mutations (Keep as they are) ---
+    const updateEmployeeMutation = useMutation({
+        mutationFn: async (variables: { employeeId: string; status: 'in' | 'out' }) => {
+          const docRef = doc(db, EMPLOYEES_COLLECTION, variables.employeeId);
+          const updateData: { [key: string]: any } = { status: variables.status };
+          if (variables.status === 'in') {
+            updateData.lastCheckIn = serverTimestamp();
+          } else {
+            updateData.lastCheckOut = serverTimestamp();
+          }
+          await updateDoc(docRef, updateData);
+        },
+         // No need to invalidate manually as onSnapshot updates the cache via setQueryData
+         onSuccess: (_, variables) => {
+            toast({
+              title: "Status Updated",
+              description: `Employee marked as ${variables.status}.`,
+            });
+          },
+         onError: (error: Error, variables) => {
+           console.error("Error updating employee status:", error);
+           toast({
+             variant: "destructive",
+             title: "Update Failed",
+             description: `Could not mark employee as ${variables.status}. Please try again.`,
+           });
+         },
+      });
 
-  const checkOut = (employeeId: string) => {
-    updateEmployeeMutation.mutate({ employeeId, status: 'out' });
-  };
+    const addEmployeeMutation = useMutation({
+        mutationFn: async (variables: { name: string }) => {
+          const newEmployeeData: Omit<Employee, 'id'> = {
+            name: variables.name,
+            status: 'out',
+            lastCheckIn: null,
+            lastCheckOut: null,
+          };
+          await addDoc(collection(db, EMPLOYEES_COLLECTION), newEmployeeData);
+        },
+        // No need to invalidate manually as onSnapshot updates the cache via setQueryData
+        onSuccess: () => {
+            toast({
+              title: "Employee Added",
+              description: "New employee successfully added.",
+            });
+          },
+        onError: (error: Error) => {
+            console.error("Error adding employee:", error);
+            toast({
+              variant: "destructive",
+              title: "Add Failed",
+              description: "Could not add the new employee. Please try again.",
+            });
+          },
+      });
 
-   const addEmployee = (name: string) => {
-    addEmployeeMutation.mutate({ name });
-  };
+    // --- Exported Functions ---
+    const checkIn = (employeeId: string) => {
+        updateEmployeeMutation.mutate({ employeeId, status: 'in' });
+    };
 
-  // Ensure the data arrays are correctly typed, defaulting to empty array
-  const allEmployeesData: Employee[] = Array.isArray(allEmployeesQuery.data) ? allEmployeesQuery.data : [];
-  const presentEmployeesData: Employee[] = Array.isArray(presentEmployeesQuery.data) ? presentEmployeesQuery.data : [];
+    const checkOut = (employeeId: string) => {
+        updateEmployeeMutation.mutate({ employeeId, status: 'out' });
+    };
 
+    const addEmployee = (name: string) => {
+        addEmployeeMutation.mutate({ name });
+    };
 
-  return {
-    allEmployees: allEmployeesData,
-    presentEmployees: presentEmployeesData,
-    isLoadingAll: allEmployeesQuery.isLoading,
-    isLoadingPresent: presentEmployeesQuery.isLoading,
-    isUpdating: updateEmployeeMutation.isPending,
-    isAdding: addEmployeeMutation.isPending,
-    checkIn,
-    checkOut,
-    addEmployee,
-    refetchAll: allEmployeesQuery.refetch,
-    refetchPresent: presentEmployeesQuery.refetch,
-  };
+    // --- Return Values ---
+    // Use data from useQuery, defaulting to empty array if undefined/null
+    const allEmployeesData: Employee[] = allEmployeesQuery.data ?? [];
+    const presentEmployeesData: Employee[] = presentEmployeesQuery.data ?? [];
+
+    return {
+        allEmployees: allEmployeesData,
+        presentEmployees: presentEmployeesData,
+        // isLoading flags now reflect the initial fetch status from useQuery
+        isLoadingAll: allEmployeesQuery.isLoading,
+        isLoadingPresent: presentEmployeesQuery.isLoading,
+        isUpdating: updateEmployeeMutation.isPending,
+        isAdding: addEmployeeMutation.isPending,
+        checkIn,
+        checkOut,
+        addEmployee,
+        // Refetch functions from useQuery can be used to manually trigger the queryFn again
+        refetchAll: allEmployeesQuery.refetch,
+        refetchPresent: presentEmployeesQuery.refetch,
+    };
 }
