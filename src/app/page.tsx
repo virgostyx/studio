@@ -3,7 +3,7 @@
 
 import { EmployeeList } from '@/components/employee-list';
 import { AddEmployeeForm } from '@/components/add-employee-form';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Removed CardDescription
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"; // Import Input
 import { PlusCircle, Search, Filter } from 'lucide-react'; // Import Search and Filter icons
@@ -127,4 +127,3 @@ export default function Home() {
     </main>
   );
 }
-

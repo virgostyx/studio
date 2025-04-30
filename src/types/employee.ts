@@ -1,10 +1,12 @@
-import type { Timestamp } from 'firebase/firestore';
+
+// No need to import Timestamp for file storage
+// import type { Timestamp } from 'firebase/firestore'; // This was for Firestore
 
 export interface Employee {
-  id: string; // Firestore document ID
+  id: string; // Unique ID (e.g., UUID)
   name: string;
-  department: string; // Added department field
+  department: string;
   status: 'in' | 'out';
-  lastCheckIn: Timestamp | null;
-  lastCheckOut: Timestamp | null;
+  lastCheckIn: string | null; // ISO 8601 date string
+  lastCheckOut: string | null; // ISO 8601 date string
 }
