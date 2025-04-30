@@ -1,3 +1,4 @@
+
 "use client"; // Add 'use client' directive
 
 import { EmployeeList } from '@/components/employee-list';
@@ -54,36 +55,35 @@ export default function Home() {
             <TabsTrigger value="all" className="flex-1 md:flex-none">All Employees</TabsTrigger>
           </TabsList>
 
-          {/* Search and Filter Controls - Conditionally rendered for 'All Employees' tab */}
-          {activeTab === 'all' && (
-            <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-              <div className="relative w-full md:flex-grow">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search employees..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 w-full"
-                />
-              </div>
-              {/* Department Filter Dropdown */}
-              <div className="relative w-full md:w-[200px]">
-                 <Filter className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                 <Select value={selectedDepartment || "all"} onValueChange={handleDepartmentChange}>
-                    <SelectTrigger className="pl-8 w-full">
-                        <SelectValue placeholder="Filter by Department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Departments</SelectItem>
-                        {departments.map(dept => (
-                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                        ))}
-                    </SelectContent>
-                 </Select>
-              </div>
+          {/* Search and Filter Controls - Now always visible */}
+          <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto flex-grow">
+            <div className="relative w-full md:flex-grow">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search employees..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 w-full"
+              />
             </div>
-          )}
+            {/* Department Filter Dropdown */}
+            <div className="relative w-full md:w-[200px]">
+                <Filter className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Select value={selectedDepartment || "all"} onValueChange={handleDepartmentChange}>
+                  <SelectTrigger className="pl-8 w-full">
+                      <SelectValue placeholder="Filter by Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {departments.map(dept => (
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+            </div>
+          </div>
+
 
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
@@ -105,15 +105,26 @@ export default function Home() {
 
         </div>
         <TabsContent value="present">
-          {/* Pass empty string for departmentFilter when not applicable */}
-          <EmployeeList filter="present" title="Employees Currently In Office" searchQuery="" departmentFilter="" />
+          {/* Pass the searchQuery and selectedDepartment state to the 'present' list */}
+          <EmployeeList
+            filter="present"
+            title="Employees Currently In Office"
+            searchQuery={searchQuery}
+            departmentFilter={selectedDepartment}
+          />
         </TabsContent>
         <TabsContent value="all">
           {/* Pass the searchQuery and selectedDepartment state to the 'All Employees' list */}
-          <EmployeeList filter="all" title="All Registered Employees" searchQuery={searchQuery} departmentFilter={selectedDepartment} />
+          <EmployeeList
+            filter="all"
+            title="All Registered Employees"
+            searchQuery={searchQuery}
+            departmentFilter={selectedDepartment}
+          />
         </TabsContent>
       </Tabs>
 
     </main>
   );
 }
+

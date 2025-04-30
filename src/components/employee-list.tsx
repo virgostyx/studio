@@ -47,11 +47,11 @@ export function EmployeeList({ filter, title, searchQuery = "", departmentFilter
   const isLoading = filter === 'all' ? isLoadingAll : isLoadingPresent;
   const baseEmployees = filter === 'all' ? allEmployees : presentEmployees;
 
-  // Apply filtering
+  // Apply filtering (now works for both tabs)
   const filteredEmployees = baseEmployees.filter(employee => {
     const nameMatch = !searchQuery || employee.name.toLowerCase().includes(searchQuery.toLowerCase());
-    // Only apply department filter if it's the 'all' list and a filter is selected
-    const departmentMatch = filter !== 'all' || !departmentFilter || employee.department === departmentFilter;
+    // Apply department filter if a filter is selected (works for both tabs)
+    const departmentMatch = !departmentFilter || employee.department === departmentFilter;
     return nameMatch && departmentMatch;
   });
 
@@ -92,7 +92,9 @@ export function EmployeeList({ filter, title, searchQuery = "", departmentFilter
      if (sortedEmployees.length === 0) {
         let message = 'No employees listed.';
         if(filter === 'present') {
-            message = 'No employees currently in the office.';
+            message = searchQuery || departmentFilter
+                ? 'No employees currently in the office match the criteria.'
+                : 'No employees currently in the office.';
         } else if (searchQuery || departmentFilter) {
             message = `No employees found matching the criteria.`;
         }
@@ -105,7 +107,6 @@ export function EmployeeList({ filter, title, searchQuery = "", departmentFilter
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                {/* Always show Department column now */}
                 <TableHead><Building className="inline-block mr-1 h-4 w-4"/>Department</TableHead>
                 {/* Conditionally show Status only for 'all' list */}
                 {filter === 'all' && <TableHead>Status</TableHead>}
@@ -116,6 +117,7 @@ export function EmployeeList({ filter, title, searchQuery = "", departmentFilter
               {sortedEmployees.map((employee) => (
                 <TableRow key={employee.id}>
                   <TableCell className="font-medium flex items-center gap-2">
+                     {/* Show delete button only in 'all' list */}
                      {filter === 'all' && (
                       <Button
                         variant="ghost"
@@ -130,7 +132,6 @@ export function EmployeeList({ filter, title, searchQuery = "", departmentFilter
                      )}
                      {employee.name}
                   </TableCell>
-                  {/* Display Department */}
                   <TableCell>{employee.department || '-'}</TableCell>
                   {/* Conditionally display Status */}
                   {filter === 'all' && (
@@ -208,3 +209,4 @@ export function EmployeeList({ filter, title, searchQuery = "", departmentFilter
     </>
   );
 }
+
