@@ -15,13 +15,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      {/* Removed GeistSans variable and font-sans class from className */}
-      <body className={`antialiased`}>
-        <Providers> {/* Wrap children with Providers */}
-          {children}
-        </Providers>
-      </body>
-    </html>
+    <html lang="en"> 
+      <head>
+          <link rel="manifest" href="/manifest.json" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="mobile-web-app-capable" content="yes" />
+      </head>
+        <body className={`antialiased`}>
+          <Providers>
+            {children}
+          </Providers>
+        </body>
+      </html>
   );
 }
