@@ -21,7 +21,8 @@ export function useEmployees() {
         queryFn: async () => {
              const q = query(collection(db, EMPLOYEES_COLLECTION));
              const snapshot = await getDocs(q);
-             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+             // Ensure department defaults to empty string if missing
+             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), department: doc.data().department || '' } as Employee));
         },
         staleTime: Infinity,
         refetchOnWindowFocus: false,
@@ -33,7 +34,8 @@ export function useEmployees() {
         queryFn: async () => {
             const q = query(collection(db, EMPLOYEES_COLLECTION), where('status', '==', 'in'));
             const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+             // Ensure department defaults to empty string if missing
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), department: doc.data().department || '' } as Employee));
         },
         staleTime: Infinity,
         refetchOnWindowFocus: false,
@@ -43,7 +45,8 @@ export function useEmployees() {
     React.useEffect(() => {
         const qAll = query(collection(db, EMPLOYEES_COLLECTION));
         const unsubscribeAll = onSnapshot(qAll, (snapshot: QuerySnapshot<DocumentData>) => {
-            const updatedData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+             // Ensure department defaults to empty string if missing
+            const updatedData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), department: doc.data().department || '' } as Employee));
             queryClient.setQueryData(queryKeyAll, updatedData);
         }, (error) => {
             console.error("Error listening to all employees:", error);
@@ -52,7 +55,8 @@ export function useEmployees() {
 
         const qPresent = query(collection(db, EMPLOYEES_COLLECTION), where('status', '==', 'in'));
         const unsubscribePresent = onSnapshot(qPresent, (snapshot: QuerySnapshot<DocumentData>) => {
-            const updatedData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+             // Ensure department defaults to empty string if missing
+            const updatedData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), department: doc.data().department || '' } as Employee));
             queryClient.setQueryData(queryKeyPresent, updatedData);
         }, (error) => {
             console.error("Error listening to present employees:", error);
@@ -94,9 +98,11 @@ export function useEmployees() {
       });
 
     const addEmployeeMutation = useMutation({
-        mutationFn: async (variables: { name: string }) => {
+        // Update mutation function to accept department
+        mutationFn: async (variables: { name: string; department: string }) => {
           const newEmployeeData: Omit<Employee, 'id'> = {
             name: variables.name,
+            department: variables.department, // Add department
             status: 'out',
             lastCheckIn: null,
             lastCheckOut: null,
@@ -151,8 +157,9 @@ export function useEmployees() {
         updateEmployeeMutation.mutate({ employeeId, status: 'out' });
     };
 
-    const addEmployee = (name: string) => {
-        addEmployeeMutation.mutate({ name });
+    // Update addEmployee to accept department
+    const addEmployee = (name: string, department: string) => {
+        addEmployeeMutation.mutate({ name, department });
     };
 
     const deleteEmployee = (employeeId: string) => {
@@ -163,18 +170,26 @@ export function useEmployees() {
     const allEmployeesData: Employee[] = allEmployeesQuery.data ?? [];
     const presentEmployeesData: Employee[] = presentEmployeesQuery.data ?? [];
 
+    // Extract unique departments
+    const departments = React.useMemo(() => {
+        const deptSet = new Set(allEmployeesData.map(emp => emp.department).filter(Boolean)); // Filter out empty strings
+        return Array.from(deptSet).sort();
+    }, [allEmployeesData]);
+
+
     return {
         allEmployees: allEmployeesData,
         presentEmployees: presentEmployeesData,
+        departments, // Expose departments
         isLoadingAll: allEmployeesQuery.isLoading,
         isLoadingPresent: presentEmployeesQuery.isLoading,
         isUpdating: updateEmployeeMutation.isPending,
         isAdding: addEmployeeMutation.isPending,
-        isDeleting: deleteEmployeeMutation.isPending, // Expose delete state
+        isDeleting: deleteEmployeeMutation.isPending,
         checkIn,
         checkOut,
         addEmployee,
-        deleteEmployee, // Expose delete function
+        deleteEmployee,
         refetchAll: allEmployeesQuery.refetch,
         refetchPresent: presentEmployeesQuery.refetch,
     };

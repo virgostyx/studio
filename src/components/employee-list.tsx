@@ -6,10 +6,8 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { LogIn, LogOut, User, Clock, Users, Trash2 } from 'lucide-react'; // Import Trash2 icon
-import { formatDistanceToNow } from 'date-fns';
+import { LogIn, LogOut, User, Users, Trash2, Building } from 'lucide-react'; // Import Building icon, remove Clock
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Timestamp } from 'firebase/firestore';
 import type { Employee } from '@/types/employee'; // Import Employee type
 import {
   AlertDialog,
@@ -27,9 +25,10 @@ interface EmployeeListProps {
   filter: 'all' | 'present';
   title: string;
   searchQuery?: string;
+  departmentFilter?: string; // Added department filter prop
 }
 
-export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListProps) {
+export function EmployeeList({ filter, title, searchQuery = "", departmentFilter = "" }: EmployeeListProps) {
   const {
     allEmployees,
     presentEmployees,
@@ -48,33 +47,16 @@ export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListPr
   const isLoading = filter === 'all' ? isLoadingAll : isLoadingPresent;
   const baseEmployees = filter === 'all' ? allEmployees : presentEmployees;
 
-  const filteredEmployees = filter === 'all' && searchQuery
-    ? baseEmployees.filter(employee =>
-        employee.name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : baseEmployees;
+  // Apply filtering
+  const filteredEmployees = baseEmployees.filter(employee => {
+    const nameMatch = !searchQuery || employee.name.toLowerCase().includes(searchQuery.toLowerCase());
+    // Only apply department filter if it's the 'all' list and a filter is selected
+    const departmentMatch = filter !== 'all' || !departmentFilter || employee.department === departmentFilter;
+    return nameMatch && departmentMatch;
+  });
+
 
   const sortedEmployees = [...filteredEmployees].sort((a, b) => a.name.localeCompare(b.name));
-
-  const renderTimestamp = (timestamp: Timestamp | null) => {
-    if (!timestamp) return '-';
-    try {
-      const date = timestamp.toDate();
-      return formatDistanceToNow(date, { addSuffix: true });
-    } catch (error) {
-      console.error("Error formatting timestamp:", timestamp, error);
-      if (timestamp && typeof timestamp.toDate === 'function') {
-         try {
-            const date = timestamp.toDate();
-            return formatDistanceToNow(date, { addSuffix: true });
-         } catch(innerError) {
-             console.error("Error converting Firestore Timestamp:", innerError);
-             return 'Invalid Date';
-         }
-      }
-      return 'Invalid Date Input';
-    }
-  };
 
   const handleDeleteClick = (employee: Employee) => {
     setEmployeeToDelete(employee);
@@ -107,11 +89,13 @@ export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListPr
      }
 
      if (sortedEmployees.length === 0) {
-        const message = filter === 'present'
-            ? 'No employees currently in the office.'
-            : searchQuery
-            ? `No employees found matching "${searchQuery}".`
-            : 'No employees listed.';
+        let message = 'No employees listed.';
+        if(filter === 'present') {
+            message = 'No employees currently in the office.';
+        } else if (searchQuery || departmentFilter) {
+            message = `No employees found matching the criteria.`;
+        }
+
         return <p className="text-muted-foreground text-center py-4">{message}</p>;
      }
 
@@ -121,8 +105,8 @@ export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListPr
               <TableRow>
                 <TableHead>Name</TableHead>
                 {filter === 'all' && <TableHead>Status</TableHead>}
-                {filter === 'all' && <TableHead><Clock className="inline-block mr-1 h-4 w-4"/>Last Check-In</TableHead>}
-                {filter === 'all' && <TableHead><Clock className="inline-block mr-1 h-4 w-4"/>Last Check-Out</TableHead>}
+                {/* Replace Time columns with Department */}
+                {filter === 'all' && <TableHead><Building className="inline-block mr-1 h-4 w-4"/>Department</TableHead>}
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -151,8 +135,8 @@ export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListPr
                         </span>
                      </TableCell>
                   )}
-                   {filter === 'all' && <TableCell>{renderTimestamp(employee.lastCheckIn)}</TableCell>}
-                   {filter === 'all' && <TableCell>{renderTimestamp(employee.lastCheckOut)}</TableCell>}
+                  {/* Display Department */}
+                   {filter === 'all' && <TableCell>{employee.department || '-'}</TableCell>}
                   <TableCell className="text-right">
                     {employee.status === 'out' ? (
                       <Button

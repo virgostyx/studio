@@ -5,7 +5,7 @@ import { AddEmployeeForm } from '@/components/add-employee-form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"; // Import Input
-import { PlusCircle, Search } from 'lucide-react'; // Import Search icon
+import { PlusCircle, Search, Filter } from 'lucide-react'; // Import Search and Filter icons
 import {
   Dialog,
   DialogContent,
@@ -16,12 +16,28 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from '@/components/ui/button';
 import React from 'react'; // Import React
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select" // Import Select components
+import { useEmployees } from '@/hooks/useEmployees'; // Import useEmployees
 
 export default function Home() {
   // Using state variables
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [activeTab, setActiveTab] = React.useState("present"); // State for active tab
+  const [selectedDepartment, setSelectedDepartment] = React.useState(""); // State for department filter
+
+  // Get departments from the hook
+  const { departments } = useEmployees();
+
+  const handleDepartmentChange = (value: string) => {
+    setSelectedDepartment(value === "all" ? "" : value); // Set to empty string if 'all' is selected
+  };
 
   return (
     <main className="container mx-auto p-4 md:p-8">
@@ -32,29 +48,46 @@ export default function Home() {
 
       {/* Update Tabs component to manage active tab state */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-          <TabsList>
-            <TabsTrigger value="present">Currently Present</TabsTrigger>
-            <TabsTrigger value="all">All Employees</TabsTrigger>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4 flex-wrap">
+          <TabsList className="w-full md:w-auto">
+            <TabsTrigger value="present" className="flex-1 md:flex-none">Currently Present</TabsTrigger>
+            <TabsTrigger value="all" className="flex-1 md:flex-none">All Employees</TabsTrigger>
           </TabsList>
 
-          {/* Search Input - Conditionally rendered for 'All Employees' tab */}
+          {/* Search and Filter Controls - Conditionally rendered for 'All Employees' tab */}
           {activeTab === 'all' && (
-            <div className="relative w-full md:w-auto">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search employees..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 w-full md:w-[250px]" // Adjust width as needed
-              />
+            <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+              <div className="relative w-full md:flex-grow">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search employees..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 w-full"
+                />
+              </div>
+              {/* Department Filter Dropdown */}
+              <div className="relative w-full md:w-[200px]">
+                 <Filter className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                 <Select value={selectedDepartment || "all"} onValueChange={handleDepartmentChange}>
+                    <SelectTrigger className="pl-8 w-full">
+                        <SelectValue placeholder="Filter by Department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Departments</SelectItem>
+                        {departments.map(dept => (
+                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                        ))}
+                    </SelectContent>
+                 </Select>
+              </div>
             </div>
           )}
 
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-               <Button variant="default" className="w-full md:w-auto">
+               <Button variant="default" className="w-full md:w-auto mt-2 md:mt-0">
                  <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
                </Button>
             </DialogTrigger>
@@ -62,21 +95,22 @@ export default function Home() {
               <DialogHeader>
                 <DialogTitle>Add New Employee</DialogTitle>
                 <DialogDescription>
-                  Enter the name of the new employee to add them to the system.
+                  Enter the name and department of the new employee.
                 </DialogDescription>
               </DialogHeader>
+              {/* Pass department prop to AddEmployeeForm */}
               <AddEmployeeForm onFormSubmit={() => setIsAddDialogOpen(false)} /> {/* Close dialog on submit */}
             </DialogContent>
           </Dialog>
 
         </div>
         <TabsContent value="present">
-          {/* Pass null or empty string for searchQuery when not applicable */}
-          <EmployeeList filter="present" title="Employees Currently In Office" searchQuery="" />
+          {/* Pass empty string for departmentFilter when not applicable */}
+          <EmployeeList filter="present" title="Employees Currently In Office" searchQuery="" departmentFilter="" />
         </TabsContent>
         <TabsContent value="all">
-          {/* Pass the searchQuery state to the 'All Employees' list */}
-          <EmployeeList filter="all" title="All Registered Employees" searchQuery={searchQuery} />
+          {/* Pass the searchQuery and selectedDepartment state to the 'All Employees' list */}
+          <EmployeeList filter="all" title="All Registered Employees" searchQuery={searchQuery} departmentFilter={selectedDepartment} />
         </TabsContent>
       </Tabs>
 
