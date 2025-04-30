@@ -5,7 +5,7 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { LogIn, LogOut, User, Clock } from 'lucide-react';
+import { LogIn, LogOut, User, Clock, Users } from 'lucide-react'; // Import Users icon
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Timestamp } from 'firebase/firestore'; // Import Timestamp directly
@@ -13,9 +13,10 @@ import type { Timestamp } from 'firebase/firestore'; // Import Timestamp directl
 interface EmployeeListProps {
   filter: 'all' | 'present';
   title: string;
+  searchQuery?: string; // Optional search query prop
 }
 
-export function EmployeeList({ filter, title }: EmployeeListProps) {
+export function EmployeeList({ filter, title, searchQuery = "" }: EmployeeListProps) {
   const {
     allEmployees,
     presentEmployees,
@@ -27,10 +28,17 @@ export function EmployeeList({ filter, title }: EmployeeListProps) {
   } = useEmployees();
 
   const isLoading = filter === 'all' ? isLoadingAll : isLoadingPresent;
-  const employees = filter === 'all' ? allEmployees : presentEmployees;
+  const baseEmployees = filter === 'all' ? allEmployees : presentEmployees;
+
+  // Filter employees based on search query if applicable
+  const filteredEmployees = filter === 'all' && searchQuery
+    ? baseEmployees.filter(employee =>
+        employee.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : baseEmployees;
 
   // Sort employees alphabetically by name
-  const sortedEmployees = [...employees].sort((a, b) => a.name.localeCompare(b.name));
+  const sortedEmployees = [...filteredEmployees].sort((a, b) => a.name.localeCompare(b.name));
 
   const renderTimestamp = (timestamp: Timestamp | null) => { // Use Timestamp type directly
     if (!timestamp) return '-';
@@ -53,17 +61,10 @@ export function EmployeeList({ filter, title }: EmployeeListProps) {
     }
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          {filter === 'present' ? <User className="h-5 w-5 text-primary" /> : <Users className="h-5 w-5 text-secondary" />}
-          {title} ({isLoading ? '...' : sortedEmployees.length})
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="space-y-2">
+  const renderTableContent = () => {
+     if (isLoading) {
+        return (
+          <div className="space-y-2 p-4"> {/* Added padding for loading state */}
             {[...Array(5)].map((_, i) => (
                <div key={i} className="flex items-center justify-between p-2">
                  <div className="flex items-center gap-2">
@@ -74,10 +75,20 @@ export function EmployeeList({ filter, title }: EmployeeListProps) {
                </div>
             ))}
           </div>
-        ) : sortedEmployees.length === 0 ? (
-           <p className="text-muted-foreground text-center py-4">No employees currently {filter === 'present' ? 'in the office' : 'listed'}.</p>
-        ) :(
-          <Table>
+        );
+     }
+
+     if (sortedEmployees.length === 0) {
+        const message = filter === 'present'
+            ? 'No employees currently in the office.'
+            : searchQuery
+            ? `No employees found matching "${searchQuery}".`
+            : 'No employees listed.';
+        return <p className="text-muted-foreground text-center py-4">{message}</p>;
+     }
+
+     return (
+         <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
@@ -93,7 +104,7 @@ export function EmployeeList({ filter, title }: EmployeeListProps) {
                   <TableCell className="font-medium">{employee.name}</TableCell>
                   {filter === 'all' && (
                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${employee.status === 'in' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${employee.status === 'in' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
                             {employee.status === 'in' ? 'In Office' : 'Out of Office'}
                         </span>
                      </TableCell>
@@ -129,29 +140,43 @@ export function EmployeeList({ filter, title }: EmployeeListProps) {
               ))}
             </TableBody>
           </Table>
-        )}
+     )
+  }
+
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          {filter === 'present' ? <User className="h-5 w-5 text-primary" /> : <Users className="h-5 w-5 text-secondary" />}
+          {title} ({isLoading ? '...' : sortedEmployees.length})
+        </CardTitle>
+      </CardHeader>
+      {/* Removed default padding from CardContent to allow Table/Skeleton to control spacing */}
+      <CardContent className="p-0">
+         {renderTableContent()}
       </CardContent>
     </Card>
   );
 }
 
-// Add a simple Users icon component if not available in lucide-react
-const Users = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
-    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
+// Keep the Users icon component as it is
+// const Users = (props: React.SVGProps<SVGSVGElement>) => (
+//   <svg
+//     xmlns="http://www.w3.org/2000/svg"
+//     width="24"
+//     height="24"
+//     viewBox="0 0 24 24"
+//     fill="none"
+//     stroke="currentColor"
+//     strokeWidth="2"
+//     strokeLinecap="round"
+//     strokeLinejoin="round"
+//     {...props}
+//   >
+//     <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+//     <circle cx="9" cy="7" r="4" />
+//     <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+//     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+//   </svg>
+// );
