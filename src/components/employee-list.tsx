@@ -6,7 +6,7 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { Button, buttonVariants } from '@/components/ui/button'; // Import buttonVariants
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { LogIn, LogOut, User, Users, Trash2, Building } from 'lucide-react'; // Import Building icon, remove Clock
+import { LogIn, LogOut, User, Users, Trash2, Building } from 'lucide-react'; // Import Building icon
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Employee } from '@/types/employee'; // Import Employee type
 import {
@@ -80,6 +80,7 @@ export function EmployeeList({ filter, title, searchQuery = "", departmentFilter
                  <div className="flex items-center gap-2">
                     <Skeleton className="h-8 w-8 rounded-full" />
                     <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-24" /> {/* Skeleton for department */}
                  </div>
                  <Skeleton className="h-8 w-20" />
                </div>
@@ -104,9 +105,10 @@ export function EmployeeList({ filter, title, searchQuery = "", departmentFilter
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                {/* Always show Department column now */}
+                <TableHead><Building className="inline-block mr-1 h-4 w-4"/>Department</TableHead>
+                {/* Conditionally show Status only for 'all' list */}
                 {filter === 'all' && <TableHead>Status</TableHead>}
-                {/* Replace Time columns with Department */}
-                {filter === 'all' && <TableHead><Building className="inline-block mr-1 h-4 w-4"/>Department</TableHead>}
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -128,6 +130,9 @@ export function EmployeeList({ filter, title, searchQuery = "", departmentFilter
                      )}
                      {employee.name}
                   </TableCell>
+                  {/* Display Department */}
+                  <TableCell>{employee.department || '-'}</TableCell>
+                  {/* Conditionally display Status */}
                   {filter === 'all' && (
                      <TableCell>
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${employee.status === 'in' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
@@ -135,8 +140,6 @@ export function EmployeeList({ filter, title, searchQuery = "", departmentFilter
                         </span>
                      </TableCell>
                   )}
-                  {/* Display Department */}
-                   {filter === 'all' && <TableCell>{employee.department || '-'}</TableCell>}
                   <TableCell className="text-right">
                     {employee.status === 'out' ? (
                       <Button
