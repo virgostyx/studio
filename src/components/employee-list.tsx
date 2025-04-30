@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { LogIn, LogOut, User, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { Timestamp } from 'firebase/firestore'; // Import Timestamp directly
 
 interface EmployeeListProps {
   filter: 'all' | 'present';
@@ -31,14 +32,24 @@ export function EmployeeList({ filter, title }: EmployeeListProps) {
   // Sort employees alphabetically by name
   const sortedEmployees = [...employees].sort((a, b) => a.name.localeCompare(b.name));
 
-  const renderTimestamp = (timestamp: firebase.firestore.Timestamp | null) => {
+  const renderTimestamp = (timestamp: Timestamp | null) => { // Use Timestamp type directly
     if (!timestamp) return '-';
     try {
       const date = timestamp.toDate();
       return formatDistanceToNow(date, { addSuffix: true });
     } catch (error) {
       console.error("Error formatting timestamp:", timestamp, error);
-      return 'Invalid Date';
+      // Check if timestamp is a Firestore Timestamp object before calling toDate()
+      if (timestamp && typeof timestamp.toDate === 'function') {
+         try {
+            const date = timestamp.toDate();
+            return formatDistanceToNow(date, { addSuffix: true });
+         } catch(innerError) {
+             console.error("Error converting Firestore Timestamp:", innerError);
+             return 'Invalid Date';
+         }
+      }
+      return 'Invalid Date Input'; // Handle cases where input is not a valid Timestamp
     }
   };
 

@@ -1,11 +1,11 @@
-import { useFirestoreQuery } from '@tanstack-query-firebase/react';
+import { useFirestoreQueryData } from '@tanstack-query-firebase/react'; // Corrected import based on likely v1 structure
 // Removed: import { useFirestoreMutation } from '@tanstack-query-firebase/react';
-import { collection, query, where, doc, updateDoc, serverTimestamp, getDocs, writeBatch, addDoc } from 'firebase/firestore';
+import { collection, query, where, doc, updateDoc, serverTimestamp, getDocs, writeBatch, addDoc, Timestamp } from 'firebase/firestore';
 import { useQueryClient, useMutation } from '@tanstack/react-query'; // Import useMutation
 import { db } from '@/lib/firebase';
 import type { Employee } from '@/types/employee';
 import { useToast } from '@/hooks/use-toast';
-import type firebase from 'firebase/compat/app'; // Import firebase namespace for Timestamp type hint if needed, otherwise remove if Timestamp comes directly from 'firebase/firestore'
+// Removed: import type firebase from 'firebase/compat/app'; // Import firebase namespace for Timestamp type hint if needed, otherwise remove if Timestamp comes directly from 'firebase/firestore'
 
 const EMPLOYEES_COLLECTION = 'employees';
 
@@ -48,60 +48,57 @@ export function useEmployees() {
   //   seedInitialEmployees();
   // }, []);
 
-  // Query for all employees
-  const allEmployeesQuery = useFirestoreQuery(
+  // Query for all employees using useFirestoreQueryData
+  // Note: The types might need adjustment based on the actual v1 implementation if `useFirestoreQueryData` expects different generics.
+  const allEmployeesQuery = useFirestoreQueryData<Employee>(
     queryKeyAll,
     query(collection(db, EMPLOYEES_COLLECTION)),
     {
       subscribe: true, // Keep listening for real-time updates
-    },
-    {
-      select: (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)),
+      idField: 'id', // Automatically map document ID to 'id' field
     }
   );
 
-  // Query for employees currently 'in' the office
-  const presentEmployeesQuery = useFirestoreQuery(
+  // Query for employees currently 'in' the office using useFirestoreQueryData
+  const presentEmployeesQuery = useFirestoreQueryData<Employee>(
     queryKeyPresent,
     query(collection(db, EMPLOYEES_COLLECTION), where('status', '==', 'in')),
     {
       subscribe: true, // Keep listening for real-time updates
-    },
-    {
-       select: (snapshot) => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)),
+      idField: 'id', // Automatically map document ID to 'id' field
     }
   );
 
-  // Mutation hook for updating employee status using useMutation
+ // Mutation hook for updating employee status using useMutation
   const updateEmployeeMutation = useMutation({
     mutationFn: async (variables: { employeeId: string; status: 'in' | 'out' }) => {
       const docRef = doc(db, EMPLOYEES_COLLECTION, variables.employeeId);
-      const updateData: Partial<Employee> = { status: variables.status };
+      // Type assertion for updateData to satisfy Firestore's update requirements
+      const updateData: { [key: string]: any } = { status: variables.status };
       if (variables.status === 'in') {
-        // Use serverTimestamp directly from 'firebase/firestore'
         updateData.lastCheckIn = serverTimestamp();
       } else {
         updateData.lastCheckOut = serverTimestamp();
       }
       await updateDoc(docRef, updateData);
     },
-    onSuccess: (_, variables) => {
-        // Invalidate both queries to refetch/update the cache
-        queryClient.invalidateQueries({ queryKey: queryKeyAll });
-        queryClient.invalidateQueries({ queryKey: queryKeyPresent });
-        toast({
-          title: "Status Updated",
-          description: `Employee marked as ${variables.status}.`,
-        });
-      },
-      onError: (error: Error, variables) => { // Add type for error
-        console.error("Error updating employee status:", error);
-        toast({
-          variant: "destructive",
-          title: "Update Failed",
-          description: `Could not mark employee as ${variables.status}. Please try again.`,
-        });
-      },
+     onSuccess: (_, variables) => {
+       // Invalidate both queries to refetch/update the cache
+       queryClient.invalidateQueries({ queryKey: queryKeyAll });
+       queryClient.invalidateQueries({ queryKey: queryKeyPresent });
+       toast({
+         title: "Status Updated",
+         description: `Employee marked as ${variables.status}.`,
+       });
+     },
+     onError: (error: Error, variables) => { // Add type for error
+       console.error("Error updating employee status:", error);
+       toast({
+         variant: "destructive",
+         title: "Update Failed",
+         description: `Could not mark employee as ${variables.status}. Please try again.`,
+       });
+     },
   });
 
 
@@ -110,8 +107,8 @@ export function useEmployees() {
      mutationFn: async (variables: { name: string }) => {
       const newEmployeeData: Omit<Employee, 'id'> = { // Define type for new employee data
         name: variables.name,
-        status: 'out',
-        lastCheckIn: null,
+        status: 'out', // Default status
+        lastCheckIn: null, // Initialize timestamps
         lastCheckOut: null,
       };
       // Use addDoc from 'firebase/firestore'
@@ -147,9 +144,14 @@ export function useEmployees() {
     addEmployeeMutation.mutate({ name });
   };
 
+  // Ensure the data arrays are correctly typed, defaulting to empty array
+  const allEmployeesData: Employee[] = Array.isArray(allEmployeesQuery.data) ? allEmployeesQuery.data : [];
+  const presentEmployeesData: Employee[] = Array.isArray(presentEmployeesQuery.data) ? presentEmployeesQuery.data : [];
+
+
   return {
-    allEmployees: allEmployeesQuery.data ?? [],
-    presentEmployees: presentEmployeesQuery.data ?? [],
+    allEmployees: allEmployeesData,
+    presentEmployees: presentEmployeesData,
     isLoadingAll: allEmployeesQuery.isLoading,
     isLoadingPresent: presentEmployeesQuery.isLoading,
     isUpdating: updateEmployeeMutation.isPending,
